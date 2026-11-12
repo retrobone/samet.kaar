@@ -1,0 +1,747 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>samet.kaar — Multilingual Text Summarizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['"Plus Jakarta Sans"', "system-ui", "sans-serif"],
+              serif: ['"Newsreader"', "Georgia", "serif"],
+              mono: ['"JetBrains Mono"', "monospace"],
+            },
+          },
+        },
+      };
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Noto+Sans+Gurmukhi:wght@400;500&family=Noto+Sans+Malayalam:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      .indic-text {
+        font-family:
+          "Plus Jakarta Sans", "Noto Sans Malayalam", "Noto Sans Gurmukhi",
+          sans-serif;
+        line-height: 1.9;
+        letter-spacing: 0.01em;
+      }
+      mark.kw-highlight {
+        background-color: #fde68a;
+        color: #78350f;
+        padding: 1px 4px;
+        border-radius: 4px;
+        font-weight: 500;
+      }
+      .dark mark.kw-highlight {
+        background-color: rgba(245, 158, 11, 0.28);
+        color: #fcd34d;
+      }
+    </style>
+  </head>
+  <body
+    class="bg-[#FAF8F5] dark:bg-[#121110] text-stone-800 dark:text-stone-100 min-h-screen flex flex-col font-sans transition-colors duration-200"
+  >
+    <!-- Top Editorial Header -->
+    <header
+      class="border-b border-stone-200/90 dark:border-stone-800 bg-white/80 dark:bg-[#181715]/90 backdrop-blur-md px-6 py-3.5 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-20"
+    >
+      <div class="flex items-center gap-3">
+        <div
+          class="w-9 h-9 rounded-lg bg-amber-600 dark:bg-amber-500 text-white dark:text-stone-950 flex items-center justify-center font-serif font-bold text-xl shadow-sm"
+        >
+          स
+        </div>
+        <div>
+          <div class="flex items-baseline gap-2">
+            <h1
+              class="font-bold text-xl tracking-tight text-stone-900 dark:text-stone-50"
+            >
+              samet<span class="text-amber-600 dark:text-amber-400">.kaar</span>
+            </h1>
+            <span
+              class="text-xs text-stone-400 dark:text-stone-500 hidden sm:inline"
+              >• समेटना (to gather)</span
+            >
+          </div>
+          <p class="text-xs text-stone-500 dark:text-stone-400">
+            Multilingual Extractive &amp; Abstractive Text Summarizer
+          </p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2.5">
+        <span
+          id="pipelineBadge"
+          class="hidden font-mono text-[11px] px-2.5 py-1 rounded-md bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300 border border-stone-200 dark:border-stone-700"
+        ></span>
+
+        <!-- Theme Toggle -->
+        <button
+          onclick="toggleTheme()"
+          title="Toggle Light/Dark Theme"
+          class="p-2 rounded-lg border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900 text-stone-600 dark:text-stone-300 hover:border-amber-500/50 transition text-xs font-medium"
+        >
+          <span id="themeLabel">Dark Mode</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Tactile Control Ribbon -->
+    <div
+      class="border-b border-stone-200/80 dark:border-stone-800/90 bg-stone-100/60 dark:bg-[#161513] px-6 py-3 flex flex-wrap items-center justify-between gap-4"
+    >
+      <div class="flex flex-wrap items-center gap-4">
+        <!-- Output Language -->
+        <div class="flex items-center gap-2">
+          <label
+            class="text-xs font-semibold text-stone-500 dark:text-stone-400"
+            >Output:</label
+          >
+          <select
+            id="targetLang"
+            class="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 rounded-lg px-3 py-1.5 text-xs font-medium text-stone-800 dark:text-stone-100 shadow-2xs focus:outline-none focus:border-amber-500 cursor-pointer"
+          >
+            <option value="auto">Same as Input (Auto)</option>
+            <option value="en">English</option>
+            <option value="hi">Hindi (हिन्दी)</option>
+            <option value="pa">Punjabi (ਪੰਜਾਬੀ)</option>
+            <option value="ml">Malayalam (മലയാളം)</option>
+            <option value="te">Telugu (తెలుగు)</option>
+            <option value="ur">Urdu (اردو)</option>
+          </select>
+        </div>
+
+        <!-- Segmented Length Control -->
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-semibold text-stone-500 dark:text-stone-400"
+            >Length:</span
+          >
+          <div
+            class="inline-flex rounded-lg bg-stone-200/70 dark:bg-stone-900 p-0.5 border border-stone-200 dark:border-stone-800"
+            id="lengthGroup"
+          >
+            <button
+              type="button"
+              onclick="setLength('brief')"
+              data-val="brief"
+              class="len-btn px-2.5 py-1 rounded-md text-xs font-medium text-stone-600 dark:text-stone-400 transition"
+            >
+              Short
+            </button>
+            <button
+              type="button"
+              onclick="setLength('standard')"
+              data-val="standard"
+              class="len-btn px-2.5 py-1 rounded-md text-xs font-medium bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 shadow-2xs transition"
+            >
+              Medium
+            </button>
+            <button
+              type="button"
+              onclick="setLength('detailed')"
+              data-val="detailed"
+              class="len-btn px-2.5 py-1 rounded-md text-xs font-medium text-stone-600 dark:text-stone-400 transition"
+            >
+              Detailed
+            </button>
+          </div>
+        </div>
+
+        <!-- Segmented Format Control -->
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-semibold text-stone-500 dark:text-stone-400"
+            >Format:</span
+          >
+          <div
+            class="inline-flex rounded-lg bg-stone-200/70 dark:bg-stone-900 p-0.5 border border-stone-200 dark:border-stone-800"
+            id="styleGroup"
+          >
+            <button
+              type="button"
+              onclick="setStyle('paragraph')"
+              data-val="paragraph"
+              class="style-btn px-2.5 py-1 rounded-md text-xs font-medium bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 shadow-2xs transition"
+            >
+              Paragraph
+            </button>
+            <button
+              type="button"
+              onclick="setStyle('bullets')"
+              data-val="bullets"
+              class="style-btn px-2.5 py-1 rounded-md text-xs font-medium text-stone-600 dark:text-stone-400 transition"
+            >
+              Bullets
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Primary Action -->
+      <button
+        id="summarizeBtn"
+        onclick="runSummarizer()"
+        class="bg-amber-600 hover:bg-amber-700 dark:bg-amber-500 dark:hover:bg-amber-400 text-white dark:text-stone-950 font-semibold px-5 py-2 rounded-lg text-xs tracking-wide transition shadow-sm flex items-center gap-2 cursor-pointer active:scale-[0.98]"
+      >
+        <span>Summarize</span>
+        <kbd
+          class="hidden sm:inline-block font-mono text-[10px] px-1.5 py-0.5 rounded bg-amber-700/40 dark:bg-stone-900/20"
+          >Ctrl+↵</kbd
+        >
+      </button>
+    </div>
+
+    <!-- Split-Pane Reading Workspace -->
+    <main
+      class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-2 gap-6"
+    >
+      <!-- Left Card: Source Document -->
+      <section
+        class="bg-white dark:bg-[#181715] border border-stone-200/90 dark:border-stone-800 rounded-2xl p-5 flex flex-col justify-between shadow-2xs"
+      >
+        <div class="flex-1 flex flex-col">
+          <!-- Source Toolbar -->
+          <div
+            class="flex flex-wrap items-center justify-between gap-2 pb-3 mb-3 border-b border-stone-100 dark:border-stone-800/80"
+          >
+            <div class="flex gap-1.5">
+              <button
+                id="tabText"
+                onclick="switchInputMode('text')"
+                class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30"
+              >
+                Source Text
+              </button>
+              <button
+                id="tabPdf"
+                onclick="switchInputMode('pdf')"
+                class="px-3 py-1.5 rounded-lg text-xs font-medium text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200"
+              >
+                PDF Upload
+              </button>
+            </div>
+
+            <div class="flex items-center gap-1.5">
+              <span class="text-[11px] text-stone-400 mr-0.5">Presets:</span>
+              <button
+                onclick="loadSample('ml')"
+                class="px-2.5 py-1 rounded-md bg-stone-100 dark:bg-stone-800 hover:bg-amber-50 dark:hover:bg-stone-700 text-xs text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-stone-700 transition"
+              >
+                മലയാളം
+              </button>
+              <button
+                onclick="loadSample('pa')"
+                class="px-2.5 py-1 rounded-md bg-stone-100 dark:bg-stone-800 hover:bg-amber-50 dark:hover:bg-stone-700 text-xs text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-stone-700 transition"
+              >
+                ਪੰਜਾਬੀ
+              </button>
+              <button
+                onclick="loadSample('en')"
+                class="px-2.5 py-1 rounded-md bg-stone-100 dark:bg-stone-800 hover:bg-amber-50 dark:hover:bg-stone-700 text-xs text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-stone-700 transition"
+              >
+                English
+              </button>
+              <button
+                onclick="clearInput()"
+                class="ml-1 px-2 py-1 text-xs text-stone-400 hover:text-rose-600 dark:hover:text-rose-400 transition"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+
+          <!-- Textarea -->
+          <textarea
+            id="textInput"
+            oninput="updateWordCount()"
+            placeholder="Paste an article, report, or paragraph in English, Hindi, Punjabi, Malayalam, Telugu, or Urdu..."
+            class="indic-text flex-1 w-full bg-transparent text-[15px] text-stone-800 dark:text-stone-100 placeholder-stone-400 dark:placeholder-stone-600 focus:outline-none resize-none min-h-[340px]"
+          ></textarea>
+
+          <!-- PDF Upload Zone -->
+          <div
+            id="pdfDropzone"
+            class="hidden flex-1 border-2 border-dashed border-stone-200 dark:border-stone-700 hover:border-amber-500/60 rounded-xl p-8 flex flex-col items-center justify-center text-center bg-stone-50/70 dark:bg-stone-900/40 min-h-[340px] transition"
+          >
+            <div
+              class="w-11 h-11 rounded-full bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-400 flex items-center justify-center font-serif font-bold text-lg mb-3"
+            >
+              PDF
+            </div>
+            <p
+              class="text-sm font-semibold text-stone-800 dark:text-stone-200 mb-1"
+            >
+              Choose a PDF Document
+            </p>
+            <p class="text-xs text-stone-500 dark:text-stone-400 mb-5 max-w-xs">
+              Extracts text across pages and summarizes in your chosen output
+              language
+            </p>
+            <input
+              type="file"
+              id="pdfInput"
+              accept=".pdf"
+              onchange="showPdfName()"
+              class="text-xs text-stone-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-amber-600 file:text-white hover:file:bg-amber-700 cursor-pointer"
+            />
+            <p
+              id="pdfFileName"
+              class="hidden mt-3 font-mono text-xs text-amber-700 dark:text-amber-400"
+            ></p>
+          </div>
+        </div>
+
+        <!-- Source Footer -->
+        <div
+          class="mt-4 pt-3 border-t border-stone-100 dark:border-stone-800/80 flex items-center justify-between text-xs text-stone-500 dark:text-stone-400"
+        >
+          <span id="wordCount" class="font-mono text-[11px]"
+            >0 words • 0 chars</span
+          >
+          <span
+            id="detectedBadge"
+            class="hidden px-2.5 py-0.5 rounded-full bg-stone-100 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-stone-700 dark:text-stone-300 font-medium text-[11px]"
+          ></span>
+        </div>
+      </section>
+
+      <!-- Right Card: Distilled Summary -->
+      <section
+        class="bg-white dark:bg-[#181715] border border-stone-200/90 dark:border-stone-800 rounded-2xl p-5 flex flex-col justify-between shadow-2xs"
+      >
+        <div class="flex-1 flex flex-col">
+          <!-- Output Toolbar -->
+          <div
+            class="flex flex-wrap items-center justify-between gap-2 pb-3 mb-3 border-b border-stone-100 dark:border-stone-800/80"
+          >
+            <div class="flex gap-1.5">
+              <button
+                id="outTabAbs"
+                onclick="switchOutputTab('abs')"
+                class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30"
+              >
+                Abstractive
+              </button>
+              <button
+                id="outTabExt"
+                onclick="switchOutputTab('ext')"
+                class="px-3 py-1.5 rounded-lg text-xs font-medium text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200"
+              >
+                Extractive (TF-IDF)
+              </button>
+            </div>
+
+            <div class="flex items-center gap-1.5">
+              <button
+                onclick="speakSummary()"
+                class="px-2.5 py-1 rounded-md bg-stone-100 dark:bg-stone-800 hover:bg-stone-200/70 dark:hover:bg-stone-700 text-xs text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-stone-700 transition"
+              >
+                Listen
+              </button>
+              <button
+                id="copyBtn"
+                onclick="copySummary()"
+                class="px-2.5 py-1 rounded-md bg-stone-100 dark:bg-stone-800 hover:bg-stone-200/70 dark:hover:bg-stone-700 text-xs text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-stone-700 transition"
+              >
+                Copy
+              </button>
+              <button
+                onclick="downloadSummary()"
+                class="px-2.5 py-1 rounded-md bg-stone-100 dark:bg-stone-800 hover:bg-stone-200/70 dark:hover:bg-stone-700 text-xs text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-stone-700 transition"
+              >
+                Save .txt
+              </button>
+            </div>
+          </div>
+
+          <!-- Loader -->
+          <div
+            id="loader"
+            class="hidden flex-1 flex flex-col items-center justify-center min-h-[340px]"
+          >
+            <div
+              class="w-8 h-8 border-[3px] border-stone-200 dark:border-stone-700 border-t-amber-600 dark:border-t-amber-400 rounded-full animate-spin mb-3"
+            ></div>
+            <p class="text-sm font-medium text-stone-700 dark:text-stone-300">
+              Gathering key points...
+            </p>
+            <p class="text-xs text-stone-400 mt-1">
+              Running sentence chunking &amp; summarization
+            </p>
+          </div>
+
+          <!-- Output Reading Pane -->
+          <div
+            id="outputBox"
+            class="indic-text flex-1 text-[15.5px] text-stone-800 dark:text-stone-100 whitespace-pre-line overflow-y-auto min-h-[340px]"
+          >
+            <span
+              class="font-serif italic text-stone-400 dark:text-stone-500 text-base"
+              >Select a preset or paste text on the left to generate a
+              summary...</span
+            >
+          </div>
+
+          <!-- Interactive Extracted Keywords -->
+          <div
+            id="keywordsContainer"
+            class="hidden mt-4 pt-3 border-t border-stone-100 dark:border-stone-800/80"
+          >
+            <div class="flex items-center justify-between mb-2">
+              <span
+                class="text-[11px] font-semibold uppercase tracking-wider text-stone-400"
+                >Key Terms (Click to highlight)</span
+              >
+              <button
+                id="clearHighlightBtn"
+                onclick="clearHighlight()"
+                class="hidden text-[11px] text-amber-600 dark:text-amber-400 hover:underline"
+              >
+                Reset highlight
+              </button>
+            </div>
+            <div id="keywordsList" class="flex flex-wrap gap-1.5"></div>
+          </div>
+        </div>
+
+        <!-- Compact Metrics Strip -->
+        <div
+          id="metricsBar"
+          class="hidden mt-4 pt-3 border-t border-stone-100 dark:border-stone-800/80 grid grid-cols-4 gap-2 text-center"
+        >
+          <div
+            class="bg-stone-50 dark:bg-stone-900/90 border border-stone-200/70 dark:border-stone-800 rounded-lg py-2 px-1"
+          >
+            <p class="text-[10px] uppercase tracking-wider text-stone-400">
+              Reduced
+            </p>
+            <p
+              id="metricCompression"
+              class="font-mono text-xs font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5"
+            >
+              0%
+            </p>
+          </div>
+          <div
+            class="bg-stone-50 dark:bg-stone-900/90 border border-stone-200/70 dark:border-stone-800 rounded-lg py-2 px-1"
+          >
+            <p class="text-[10px] uppercase tracking-wider text-stone-400">
+              Similarity
+            </p>
+            <p
+              id="metricRetention"
+              class="font-mono text-xs font-semibold text-amber-600 dark:text-amber-400 mt-0.5"
+            >
+              0%
+            </p>
+          </div>
+          <div
+            class="bg-stone-50 dark:bg-stone-900/90 border border-stone-200/70 dark:border-stone-800 rounded-lg py-2 px-1"
+          >
+            <p class="text-[10px] uppercase tracking-wider text-stone-400">
+              Words
+            </p>
+            <p
+              id="metricWords"
+              class="font-mono text-xs font-semibold text-stone-700 dark:text-stone-200 mt-0.5"
+            >
+              0 → 0
+            </p>
+          </div>
+          <div
+            class="bg-stone-50 dark:bg-stone-900/90 border border-stone-200/70 dark:border-stone-800 rounded-lg py-2 px-1"
+          >
+            <p class="text-[10px] uppercase tracking-wider text-stone-400">
+              Time
+            </p>
+            <p
+              id="metricLatency"
+              class="font-mono text-xs font-semibold text-stone-600 dark:text-stone-300 mt-0.5"
+            >
+              0.0s
+            </p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      let inputMode = "text";
+      let lengthMode = "standard";
+      let styleMode = "paragraph";
+      let currentData = null;
+      let activeOutTab = "abs";
+      let activeKeyword = null;
+
+      const langNames = {
+        en: "English",
+        hi: "Hindi",
+        pa: "Punjabi",
+        ml: "Malayalam",
+        te: "Telugu",
+        ur: "Urdu",
+      };
+
+      const SAMPLES = {
+        ml: "ഉത്തരേന്ത്യയിലും ഡൽഹിയിലും വായുമലിനീകരണം അതിരൂക്ഷമായി തുടരുകയാണ്. പഞ്ചാബിലെയും ഹരിയാനയിലെയും പാടങ്ങളിൽ വൈക്കോൽ കത്തിക്കുന്നതും ദീപാവലി ആഘോഷങ്ങളും അന്തരീക്ഷത്തിൽ കനത്ത പുകമഞ്ഞിന് കാരണമായി. വായുഗുണനിലവാരം മെച്ചപ്പെടുത്തുന്നതിനായി വായു ഗുണനിലവാര മാനേജ്‌മെന്റ് കമ്മീഷൻ (CAQM) കർശന നടപടികൾക്കും പരിശോധനകൾക്കും ഉത്തരവിട്ടിട്ടുണ്ട്. ഡൽഹിയിലെ പല പ്രദേശങ്ങളിലും വായു ഗുണനിലവാര സൂചിക (AQI) അപകടകരമായ നിലയിലേക്ക് ഉയർന്നു. സ്കൂളുകൾക്ക് അവധി നൽകുന്നതും നിർമ്മാണ പ്രവർത്തനങ്ങൾ നിയന്ത്രിക്കുന്നതും ഉൾപ്പെടെയുള്ള അടിയന്തര നടപടികൾ സർക്കാർ പരിഗണിക്കുന്നുണ്ട്.",
+        pa: "ਪੰਜਾਬ ਵਿੱਚ ਖੇਤੀਬਾੜੀ ਵਿਭਿੰਨਤਾ ਨੂੰ ਉਤਸ਼ਾਹਿਤ ਕਰਨ ਲਈ ਰਾਜ ਸਰਕਾਰ ਵੱਲੋਂ ਨਵੀਂ ਨੀਤੀ ਦਾ ਐਲਾਨ ਕੀਤਾ ਗਿਆ ਹੈ। ਇਸ ਯੋਜਨਾ ਤਹਿਤ ਕਿਸਾਨਾਂ ਨੂੰ ਕਣਕ ਅਤੇ ਝੋਨੇ ਦੇ ਰਵਾਇਤੀ ਫਸਲੀ ਚੱਕਰ ਵਿੱਚੋਂ ਕੱਢ ਕੇ ਦਾਲਾਂ, ਤੇਲ ਬੀਜਾਂ ਅਤੇ ਬਾਗਬਾਨੀ ਵੱਲ ਪ੍ਰੇਰਿਤ ਕੀਤਾ ਜਾਵੇਗਾ। ਖੇਤੀਬਾੜੀ ਮਾਹਿਰਾਂ ਅਨੁਸਾਰ ਧਰਤੀ ਹੇਠਲੇ ਪਾਣੀ ਦੇ ਡਿੱਗਦੇ ਪੱਧਰ ਨੂੰ ਬਚਾਉਣ ਲਈ ਇਹ ਕਦਮ ਬਹੁਤ ਜ਼ਰੂਰੀ ਹੈ। ਸਰਕਾਰ ਵੱਲੋਂ ਬਦਲਵੀਆਂ ਫਸਲਾਂ ਦੀ ਖਰੀਦ ਲਈ ਘੱਟੋ-ਘੱਟ ਸਮਰਥਨ ਮੁੱਲ ਅਤੇ ਸਬਸਿਡੀ ਦੇਣ ਦਾ ਵੀ ਭਰੋਸਾ ਦਿੱਤਾ ਗਿਆ ਹੈ।",
+        en: "Artificial intelligence is rapidly reshaping modern healthcare diagnostics by enabling faster and more accurate analysis of medical imaging. Deep learning models trained on millions of radiology scans can now detect early-stage anomalies in X-rays and MRIs with precision comparable to experienced specialists. Beyond imaging, natural language processing systems are automating clinical documentation, summarizing lengthy patient histories, and reducing administrative burnout for doctors. However, researchers emphasize that strict data privacy frameworks and transparent validation remain essential before autonomous AI tools are deployed widely in critical care.",
+      };
+
+      function toggleTheme() {
+        const html = document.documentElement;
+        html.classList.toggle("dark");
+        document.getElementById("themeLabel").textContent =
+          html.classList.contains("dark") ? "Light Mode" : "Dark Mode";
+      }
+
+      function setLength(val) {
+        lengthMode = val;
+        document.querySelectorAll(".len-btn").forEach((btn) => {
+          const active = btn.dataset.val === val;
+          btn.className = active
+            ? "len-btn px-2.5 py-1 rounded-md text-xs font-medium bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 shadow-2xs transition"
+            : "len-btn px-2.5 py-1 rounded-md text-xs font-medium text-stone-600 dark:text-stone-400 transition";
+        });
+      }
+
+      function setStyle(val) {
+        styleMode = val;
+        document.querySelectorAll(".style-btn").forEach((btn) => {
+          const active = btn.dataset.val === val;
+          btn.className = active
+            ? "style-btn px-2.5 py-1 rounded-md text-xs font-medium bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 shadow-2xs transition"
+            : "style-btn px-2.5 py-1 rounded-md text-xs font-medium text-stone-600 dark:text-stone-400 transition";
+        });
+      }
+
+      function loadSample(lang) {
+        switchInputMode("text");
+        document.getElementById("textInput").value = SAMPLES[lang];
+        updateWordCount();
+      }
+
+      function showPdfName() {
+        const file = document.getElementById("pdfInput").files[0];
+        const label = document.getElementById("pdfFileName");
+        if (file) {
+          label.textContent = `Selected: ${file.name} (${Math.round(file.size / 1024)} KB)`;
+          label.classList.remove("hidden");
+        }
+      }
+
+      function switchInputMode(mode) {
+        inputMode = mode;
+        document
+          .getElementById("textInput")
+          .classList.toggle("hidden", mode !== "text");
+        document
+          .getElementById("pdfDropzone")
+          .classList.toggle("hidden", mode !== "pdf");
+        document.getElementById("tabText").className =
+          mode === "text"
+            ? "px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30"
+            : "px-3 py-1.5 rounded-lg text-xs font-medium text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200";
+        document.getElementById("tabPdf").className =
+          mode === "pdf"
+            ? "px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30"
+            : "px-3 py-1.5 rounded-lg text-xs font-medium text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200";
+      }
+
+      function switchOutputTab(tab) {
+        activeOutTab = tab;
+        document.getElementById("outTabAbs").className =
+          tab === "abs"
+            ? "px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30"
+            : "px-3 py-1.5 rounded-lg text-xs font-medium text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200";
+        document.getElementById("outTabExt").className =
+          tab === "ext"
+            ? "px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30"
+            : "px-3 py-1.5 rounded-lg text-xs font-medium text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200";
+
+        renderOutputText();
+      }
+
+      function renderOutputText() {
+        if (!currentData) return;
+        const rawText =
+          activeOutTab === "abs"
+            ? currentData.abstractive_summary
+            : currentData.extractive_summary;
+        const box = document.getElementById("outputBox");
+
+        if (activeKeyword) {
+          const escaped = activeKeyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          const regex = new RegExp(`(${escaped})`, "gi");
+          box.innerHTML = rawText
+            .replace(/</g, "&lt;")
+            .replace(regex, '<mark class="kw-highlight">$1</mark>');
+        } else {
+          box.textContent = rawText;
+        }
+      }
+
+      function toggleKeywordHighlight(kw) {
+        activeKeyword = activeKeyword === kw ? null : kw;
+        document
+          .getElementById("clearHighlightBtn")
+          .classList.toggle("hidden", !activeKeyword);
+        renderOutputText();
+      }
+
+      function clearHighlight() {
+        activeKeyword = null;
+        document.getElementById("clearHighlightBtn").classList.add("hidden");
+        renderOutputText();
+      }
+
+      function updateWordCount() {
+        const txt = document.getElementById("textInput").value.trim();
+        const words = txt ? txt.split(/\s+/).length : 0;
+        document.getElementById("wordCount").textContent =
+          `${words} words • ${txt.length} chars`;
+      }
+
+      function clearInput() {
+        document.getElementById("textInput").value = "";
+        document.getElementById("pdfInput").value = "";
+        document.getElementById("pdfFileName").classList.add("hidden");
+        updateWordCount();
+      }
+
+      document.addEventListener("keydown", (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === "Enter") runSummarizer();
+      });
+
+      async function runSummarizer() {
+        const targetLang = document.getElementById("targetLang").value;
+        const loader = document.getElementById("loader");
+        const outputBox = document.getElementById("outputBox");
+        const btn = document.getElementById("summarizeBtn");
+
+        activeKeyword = null;
+        document.getElementById("clearHighlightBtn").classList.add("hidden");
+        loader.classList.remove("hidden");
+        outputBox.classList.add("hidden");
+        btn.disabled = true;
+
+        try {
+          let res;
+          if (inputMode === "text") {
+            const text = document.getElementById("textInput").value;
+            res = await fetch("/api/summarize", {
+              method: "POST",
+              headers: {"Content-Type": "application/json"},
+              body: JSON.stringify({
+                text,
+                target_lang: targetLang,
+                length_mode: lengthMode,
+                style: styleMode,
+              }),
+            });
+          } else {
+            const file = document.getElementById("pdfInput").files[0];
+            if (!file) throw new Error("Please select a PDF file first.");
+            const formData = new FormData();
+            formData.append("file", file);
+            formData.append("target_lang", targetLang);
+            formData.append("length_mode", lengthMode);
+            formData.append("style", styleMode);
+            res = await fetch("/api/summarize-pdf", {
+              method: "POST",
+              body: formData,
+            });
+          }
+
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.detail || "Summarization failed");
+
+          currentData = data;
+          loader.classList.add("hidden");
+          outputBox.classList.remove("hidden");
+          renderOutputText();
+
+          const badge = document.getElementById("detectedBadge");
+          badge.textContent = `Detected: ${langNames[data.detected_language] || data.detected_language} (${data.chunks_processed} chunk${data.chunks_processed > 1 ? "s" : ""})`;
+          badge.classList.remove("hidden");
+
+          if (data.pipeline_mode) {
+            const pb = document.getElementById("pipelineBadge");
+            pb.textContent = data.pipeline_mode;
+            pb.classList.remove("hidden");
+          }
+
+          document.getElementById("metricCompression").textContent =
+            `${data.metrics.compression_ratio}%`;
+          document.getElementById("metricRetention").textContent =
+            `${data.metrics.semantic_retention}%`;
+          document.getElementById("metricWords").textContent =
+            `${data.metrics.original_words} → ${data.metrics.summary_words}`;
+          document.getElementById("metricLatency").textContent =
+            `${data.metrics.latency_sec}s`;
+          document.getElementById("metricsBar").classList.remove("hidden");
+
+          const kwList = document.getElementById("keywordsList");
+          kwList.innerHTML = "";
+          if (data.keywords && data.keywords.length) {
+            data.keywords.forEach((kw) => {
+              const btnKw = document.createElement("button");
+              btnKw.type = "button";
+              btnKw.onclick = () => toggleKeywordHighlight(kw);
+              btnKw.className =
+                "px-2.5 py-1 rounded-md bg-stone-100 dark:bg-stone-800 hover:bg-amber-100 dark:hover:bg-amber-500/20 border border-stone-200 dark:border-stone-700 text-xs text-stone-700 dark:text-stone-300 transition cursor-pointer";
+              btnKw.textContent = kw;
+              kwList.appendChild(btnKw);
+            });
+            document
+              .getElementById("keywordsContainer")
+              .classList.remove("hidden");
+          }
+        } catch (err) {
+          loader.classList.add("hidden");
+          outputBox.classList.remove("hidden");
+          outputBox.innerHTML = `<span class="text-rose-600 dark:text-rose-400 text-sm">Error: ${err.message}</span>`;
+        } finally {
+          btn.disabled = false;
+        }
+      }
+
+      function speakSummary() {
+        const text = document.getElementById("outputBox").textContent;
+        if (!text || !window.speechSynthesis) return;
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        if (currentData && currentData.output_language)
+          utterance.lang = currentData.output_language;
+        window.speechSynthesis.speak(utterance);
+      }
+
+      function copySummary() {
+        navigator.clipboard.writeText(
+          document.getElementById("outputBox").textContent,
+        );
+        const btn = document.getElementById("copyBtn");
+        btn.textContent = "Copied";
+        setTimeout(() => (btn.textContent = "Copy"), 1500);
+      }
+
+      function downloadSummary() {
+        const blob = new Blob(
+          [document.getElementById("outputBox").textContent],
+          {type: "text/plain;charset=utf-8"},
+        );
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "sametkaar_summary.txt";
+        a.click();
+      }
+    </script>
+  </body>
+</html>
